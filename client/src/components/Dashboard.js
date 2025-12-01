@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import CalendarHeatmap from 'react-calendar-heatmap';
 import 'react-calendar-heatmap/dist/styles.css';
+import { Tooltip } from 'react-tooltip';
+import 'react-tooltip/dist/react-tooltip.css';
 import { FiLink, FiExternalLink, FiTrendingUp } from 'react-icons/fi';
 import './Dashboard.css';
 
@@ -27,8 +29,11 @@ function Dashboard({ user, setUser }) {
       const res = await axios.get(`/api/leetcode/stats/${username}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      
+      console.log('LeetCode data received:', res.data);
       setStats(res.data);
     } catch (err) {
+      console.error('Error fetching LeetCode data:', err);
       setError(err.response?.data?.message || 'Failed to fetch LeetCode data');
     } finally {
       setLoading(false);
@@ -72,23 +77,33 @@ function Dashboard({ user, setUser }) {
   };
 
   const getHeatmapData = () => {
-    if (!stats?.submissionCalendar) return [];
+    if (!stats?.submissionCalendar) {
+      console.log('No submission calendar data');
+      return [];
+    }
 
     const data = [];
     const today = new Date();
+    const oneYearAgo = new Date(today);
+    oneYearAgo.setFullYear(today.getFullYear() - 1);
+
+    console.log('Submission calendar:', stats.submissionCalendar);
     
-    for (let i = 365; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const timestamp = Math.floor(date.getTime() / 1000).toString();
+    // Convert submission calendar to array format
+    for (let d = new Date(oneYearAgo); d <= today; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().split('T')[0];
+      const timestamp = Math.floor(d.getTime() / 1000).toString();
       const count = stats.submissionCalendar[timestamp] || 0;
       
       data.push({
-        date: date.toISOString().split('T')[0],
+        date: dateStr,
         count: count
       });
     }
 
+    console.log('Heatmap data generated:', data.length, 'days');
+    console.log('Sample data:', data.slice(0, 5));
+    
     return data;
   };
 
@@ -232,12 +247,19 @@ function Dashboard({ user, setUser }) {
                   classForValue={getColorClass}
                   showWeekdayLabels={true}
                   tooltipDataAttrs={(value) => {
-                    if (!value || !value.date) return {};
+                    if (!value || !value.date) {
+                      return {
+                        'data-tooltip-id': 'heatmap-tooltip',
+                        'data-tooltip-content': 'No data'
+                      };
+                    }
                     return {
-                      'data-tip': `${value.date}: ${value.count || 0} submissions`
+                      'data-tooltip-id': 'heatmap-tooltip',
+                      'data-tooltip-content': `${value.date}: ${value.count || 0} submission${value.count !== 1 ? 's' : ''}`
                     };
                   }}
                 />
+                <Tooltip id="heatmap-tooltip" />
               </div>
 
               <div className="heatmap-legend">
